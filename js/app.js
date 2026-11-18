@@ -277,8 +277,11 @@
       if (S.played.has(r.id)) continue;
       const c = S.crate.get(r.id);
       if (c) { S.crate.delete(r.id); r.pickWhy = 'you requested it'; return { track: r, blob: c.blob }; }
-      try { status(`Loading your request “${r.title}”…`); const blob = await loadFull(r); r.pickWhy = 'you requested it'; return { track: r, blob }; }
-      catch (e) { r.bad = true; }
+      // a request gets a second try before we give up on it (a download can fail once on a busy connection)
+      for (let k = 0; k < 2; k++) {
+        try { status(`Loading your request “${r.title}”…`); const blob = await loadFull(r); r.pickWhy = 'you requested it'; return { track: r, blob }; }
+        catch (e) { console.warn('request failed to load', r.title, e && e.message); if (k) { r.bad = true; status(`Couldn't load “${r.title}”, playing something else.`); } }
+      }
     }
     fillCrate();
     // wait for a real choice (2+ candidates) when there's time; the first song only needs one
@@ -353,6 +356,7 @@
     b.innerHTML = { idle: '<span>▶</span> Start the party', busy: '<span class="spin"></span> Getting the party ready…', tap: '<span>▶</span> Tap to play', live: '<span class="dot"></span> Live' }[state];
   }
   function goLive(t) {
+    S.live = true;
     ['#pause', '#mixnow', '#skip'].forEach(s => { $(s).disabled = false; });
     startButton('live');
     document.body.classList.add('live');
@@ -451,7 +455,7 @@
 
   // nothing ready (no internet, or every candidate failed): try again shortly, the music must not stop
   function retryNext(gen, ms = 6000) {
-    if (!S.started) return;
+    if (!S.live) return;
     status(navigator.onLine ? 'Still looking for the next song…' : offlineMsg);
     setTimeout(() => { if (S.started && gen === S.gen && !S.next && !S.loadingNext) preloadNext(); }, ms);
   }
@@ -932,13 +936,14 @@
   /* ---------- self-healing ---------- */
   // every few seconds: is the music still going, and is a next song on its way?
   setInterval(() => {
-    if (!S.started || !mixer || mixer.paused) return;
+    // only once the first song is actually playing: during start-up the start sequence owns the decks
+    if (!S.started || !S.live || !mixer || mixer.paused) return;
     const cur = mixer.current;
     if (cur.track && cur.el.paused && !cur.el.ended && !mixer.tx) cur.el.play().catch(() => {}); // e.g. after a phone call
     if (!mixer.tx && !S.next && !S.loadingNext && !S.filling && navigator.onLine) preloadNext();
   }, 8000);
   window.addEventListener('offline', () => { if (S.started) status(offlineMsg + ' The current song keeps playing.'); });
-  window.addEventListener('online', () => { if (!S.started) return; status('Back online.'); if (!S.next && !S.loadingNext) preloadNext(); fillCrate(); });
+  window.addEventListener('online', () => { if (!S.live) return; status('Back online.'); if (!S.next && !S.loadingNext) preloadNext(); fillCrate(); });
   window.addEventListener('unhandledrejection', e => console.warn('[boonbeat] background task failed:', e.reason));
 
   // init

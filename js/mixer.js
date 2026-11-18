@@ -254,7 +254,8 @@
     unlock() {
       const silent = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
       for (const d of this.decks) {
-        try { d.el.src = silent; const p = d.el.play(); if (p && p.then) p.then(() => d.el.pause(), () => {}); } catch (e) { /* fine */ }
+        // only pause the silence itself: a real song may already have been loaded into this deck
+        try { d.el.src = silent; const p = d.el.play(); if (p && p.then) p.then(() => { if (d.el.src === silent) d.el.pause(); }, () => {}); } catch (e) { /* fine */ }
       }
       try { this.ctx.resume(); } catch (e) { /* fine */ }
     }
