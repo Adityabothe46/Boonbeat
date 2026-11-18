@@ -1,6 +1,6 @@
 # Boonbeat
 
-**Your AI DJ, in the browser.** Open it at **https://adityabothe46.github.io/boonbeat**
+**Your AI DJ, in the browser.** Open it at **https://adityabothe46.github.io/Boonbeat/**
 
 Boonbeat finds party songs, picks what fits the mood, and mixes one into the next the way a real DJ would. Transitions are beat-matched and land on the phrase, and the bass is swapped so two kick drums never clash.
 
