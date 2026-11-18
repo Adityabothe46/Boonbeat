@@ -66,6 +66,12 @@
       title: tidyTitle(t.title),
       artist: (t.user && t.user.name) || 'Unknown',
       artwork: art['480x480'] || art['150x150'] || '',
+      // the same image on Audius' backup servers (some servers fail in Chrome)
+      artAlts: (() => {
+        const main = art['480x480'] || art['150x150'] || '';
+        const m = main.match(/^https?:\/\/[^/]+(\/.*)$/);
+        return m && Array.isArray(art.mirrors) ? art.mirrors.map(h => h.replace(/\/$/, '') + m[1]) : [];
+      })(),
       genre: t.genre || '',
       mood: t.mood || '',
       tags: (t.tags || '').toLowerCase(),

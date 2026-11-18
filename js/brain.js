@@ -214,11 +214,14 @@
   const ES_STRONG = new Set(('que tu mi los las del con para por amor corazon bailar baila bailando quiero todo toda viene llego esta como sin mas noche vida fuego ' +
     'mami papi bonito bonita besame perreo dale vamos tiburon aqui senora loca loco una eres soy ella nada siempre nunca mundo cielo luna contigo ' +
     'quieres tengo tienes hasta donde cuando porque solo sola cuerpo boca beso besos fiesta caliente ritmo musica mujer hombre otra otro nuestra nuestro').split(' '));
-  const ES_WEAK = new Set('el la y de me te se lo le pa va mas yo'.split(' '));
+  const ES_WEAK = new Set('el la y de me te se lo le pa va mas yo ti tu mi es un'.split(' '));
   function spanishScore(title, tags) {
     const plain = title.normalize('NFD').replace(/[̀-ͯ]/g, '');
     let s = /[ñ¿¡]/.test(title) ? 2 : /[áéíóú]/.test(title) ? 1 : 0;
-    for (const w of plain.split(/[^a-z]+/).filter(Boolean)) s += ES_STRONG.has(w) ? 1 : ES_WEAK.has(w) ? 0.5 : 0;
+    const words = plain.replace(/\(.*?\)|\[.*?\]/g, ' ').split(/[^a-z]+/).filter(Boolean);
+    for (const w of words) s += ES_STRONG.has(w) ? 1 : ES_WEAK.has(w) ? 0.5 : 0;
+    // a short title made only of Spanish words ("Sin Ti", "Te Quiero") is Spanish even with few clues
+    if (words.length >= 2 && words.length <= 5 && words.every(w => ES_STRONG.has(w) || ES_WEAK.has(w))) s += 2;
     if (/\b(reggaeton|bachata|salsa|cumbia|dembow|latin)\b/.test(tags)) s += 0.5;
     return s;
   }

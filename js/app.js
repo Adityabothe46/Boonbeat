@@ -282,7 +282,7 @@
     while (S.crate.size < want && Date.now() - t0 < maxWait && (S.filling || S.crate.size === 0)) {
       if (!current && S.crate.size >= 1 && Date.now() - t0 > firstWait) break;
       if (gen !== S.gen) return null;
-      status(`Digging through the crate… ${S.crate.size} song${S.crate.size === 1 ? '' : 's'} ready`);
+      if (!current) status(`Digging through the crate… ${S.crate.size} song${S.crate.size === 1 ? '' : 's'} ready`);
       await sleep(400);
       if (!S.filling && S.crate.size < want) fillCrate();
     }
@@ -397,14 +397,34 @@
       : 'You are offline. Connect to the internet, then tap Start.');
   }
 
+  // artwork that actually loads: the main link, then Audius' backup servers. Remembered per song.
+  function goodArt(t) {
+    if (t._artP) return t._artP;
+    const cands = [t.artwork, ...(t.artAlts || [])].filter(Boolean);
+    t._artP = (async () => {
+      for (const u of cands) {
+        const ok = await new Promise(res => { const im = new Image(); const to = setTimeout(() => res(false), 8000); im.onload = () => { clearTimeout(to); res(true); }; im.onerror = () => { clearTimeout(to); res(false); }; im.src = u; });
+        if (ok) return u;
+      }
+      return null;
+    })();
+    return t._artP;
+  }
+  const cssUrl = u => `url("${encodeURI(decodeURI(String(u)))}")`;
+  function paintArt(el, t) {
+    if (!el) return;
+    el.classList.add('noart');
+    goodArt(t).then(u => { if (u) { el.style.backgroundImage = cssUrl(u); el.classList.remove('noart'); } });
+  }
   // the page glows in the colours of the song's artwork
   function ambience(t) {
     const a = document.querySelector('.ambient i'); if (!a) return;
     a.classList.remove('on');
-    if (!t.artwork) return;
-    const img = new Image();
-    img.onload = () => { a.style.backgroundImage = `url("${t.artwork.replace(/"/g, '%22')}")`; requestAnimationFrame(() => a.classList.add('on')); };
-    img.src = t.artwork;
+    goodArt(t).then(u => {
+      if (!u || mixer.current.track !== t) return;
+      a.style.backgroundImage = cssUrl(u);
+      requestAnimationFrame(() => a.classList.add('on'));
+    });
   }
   function onNowPlaying(t) {
     S.history.push(t);
@@ -732,7 +752,8 @@
   }
   function row(t, actions = [], dim) {
     const r = document.createElement('div'); r.className = 'row' + (dim ? ' dim' : '');
-    r.innerHTML = `<div class="art${t.artwork ? '' : ' noart'}" style="background-image:url('${esc(t.artwork)}')"></div><div class="meta"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.artist)}${t.duration ? ' · ' + fmt(t.duration) : ''}</div></div>`;
+    r.innerHTML = `<div class="art"></div><div class="meta"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.artist)}${t.duration ? ' · ' + fmt(t.duration) : ''}</div></div>`;
+    paintArt(r.querySelector('.art'), t);
     r.querySelector('.meta').appendChild(chips(t));
     for (const [label, fn] of actions) { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; r.appendChild(b); }
     return r;
@@ -744,12 +765,13 @@
     const d = mixer && mixer.decks[i];
     const t = d && d.track;
     if (!t) { el.innerHTML = `<div class="empty">${i === 0 ? 'Getting the first song ready…' : 'The next song loads here'}</div>`; el.classList.remove('live'); deckCanvases[i] = null; return; }
-    el.innerHTML = `<div class="head"><div class="art${t.artwork ? '' : ' noart'}" style="background-image:url('${esc(t.artwork)}')"></div>
+    el.innerHTML = `<div class="head"><div class="art"></div>
       <div class="meta"><span class="badge"><span class="st"></span></span><div class="name" title="${esc(t.title)}">${esc(t.title)}</div><div class="artist">${t.link ? `<a href="${esc(t.link)}" target="_blank" rel="noopener">${esc(t.artist)}</a>` : esc(t.artist)}</div></div>
       <span class="thumbs"><button class="thumb up${rated(t) > 0 ? ' on' : ''}" title="More like this">👍</button><button class="thumb down${rated(t) < 0 ? ' on' : ''}" title="Never play this again">👎</button></span></div>
       <div class="chipslot"></div><div class="ebar"><i style="width:${Math.round(B.energyOf(t) * 100)}%"></i></div>
       <canvas width="800" height="140"></canvas><div class="times"><span class="el"></span><span class="rm"></span></div>
       <div class="legend"><span><i style="background:#ff3d9a88"></i>drop/chorus</span><span><i style="background:#29e3ff55"></i>breakdown</span><span><i style="background:#ff3d9a"></i>mix starts</span><span><i style="background:#b6ff3d"></i>switch / drop</span></div>`;
+    paintArt(el.querySelector('.art'), t);
     el.querySelector('.chipslot').appendChild(chips(t, { rate: d.rate }));
     el.querySelector('.thumb.up').onclick = () => thumbUp(t);
     el.querySelector('.thumb.down').onclick = () => thumbDown(t);
@@ -841,7 +863,7 @@
       if (S.filling) box.insertAdjacentHTML('beforeend', '<div class="hint">Pulling another record…</div>');
       return;
     }
-    const ex = new Set([...(S.next ? [S.next.id] : []), ...S.rejected]);
+    const ex = new Set([...(S.next ? [S.next.id] : []), ...S.rejected, ...S.played]);
     const list = B.rankList([...S.pool.values()].filter(t => !ex.has(t.id)), ctxFor(mixer && mixer.current.track), 5);
     if (!list.length) { box.innerHTML = `<div class="hint">${S.pool.size ? 'Nothing matches yet.' : 'Songs show up here once the DJ starts looking.'}</div>`; return; }
     for (const t of list) box.appendChild(row(t, [['Play next', () => request(t)]], true));
