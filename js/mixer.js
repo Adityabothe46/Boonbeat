@@ -195,9 +195,11 @@
       const trimDb = body != null && isFinite(body) ? clamp(-11 - body, -8, 5) : 0;
       this.trim.gain.setValueAtTime(Math.pow(10, trimDb / 20), this.ctx.currentTime);
       await new Promise((res, rej) => {
+        // a broken or odd file can leave the player waiting forever: give up after 20 s
+        const timer = setTimeout(() => { cleanup(); rej(new Error('this file took too long to open')); }, 20000);
         const ok = () => { cleanup(); res(); };
         const bad = () => { cleanup(); rej(new Error('cannot play this file')); };
-        const cleanup = () => { this.el.removeEventListener('canplay', ok); this.el.removeEventListener('error', bad); };
+        const cleanup = () => { clearTimeout(timer); this.el.removeEventListener('canplay', ok); this.el.removeEventListener('error', bad); };
         this.el.addEventListener('canplay', ok); this.el.addEventListener('error', bad);
       });
       this.reset();
@@ -240,13 +242,22 @@
       this.lastPhaseErr = 0;
       this.timer = setInterval(() => this.tick(), 40);
       for (const d of this.decks) d.el.addEventListener('ended', () => {
-        if (d === this.current && !this.tx && this.onEnded) this.onEnded();
+        if (d.track && d === this.current && !this.tx && this.onEnded) this.onEnded();
       });
     }
     get current() { return this.decks[this.cur]; }
     get other() { return this.decks[1 - this.cur]; }
 
     async resume() { if (this.ctx.state !== 'running') await this.ctx.resume(); }
+    // iPhones only let a page start audio right after a tap. Call this inside the Start tap: it plays a
+    // moment of silence on both decks, which unlocks them for the rest of the night.
+    unlock() {
+      const silent = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+      for (const d of this.decks) {
+        try { d.el.src = silent; const p = d.el.play(); if (p && p.then) p.then(() => d.el.pause(), () => {}); } catch (e) { /* fine */ }
+      }
+      try { this.ctx.resume(); } catch (e) { /* fine */ }
+    }
     setVolume(v) { this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05); }
 
     async startFirst(track, blob) {

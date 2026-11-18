@@ -2,39 +2,46 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Boonbeat</title>
 <link rel="icon" href="icon.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#08080f">
+<meta name="theme-color" content="#07070d">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Boonbeat">
 <meta name="description" content="Your AI DJ: picks party songs and mixes them with beat-matched transitions.">
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
+<div class="wrap">
+
 <header class="top">
-  <div class="logo">Boon<span>beat</span></div>
-  <div id="status" class="status">Pick a mode and a language, then hit Start.</div>
-  <label class="vol">Vol <input id="volume" type="range" min="0" max="1" step="0.01" value="0.9"></label>
+  <div class="brand"><img src="icon-192.png" alt=""><div class="logo">Boon<span>beat</span></div></div>
+  <div class="statusbox"><span class="pulse"></span><div id="status" class="status">Pick a vibe and a language, then start the party.</div></div>
+  <label class="vol" title="Volume"><span aria-hidden="true">🔊</span><input id="volume" type="range" min="0" max="1" step="0.01" value="0.9" aria-label="Volume"></label>
 </header>
 
-<section class="controls">
+<section class="hero">
+  <h1>Your AI DJ for tonight</h1>
+  <p>Pick the vibe and the language. Boonbeat finds the songs, reads their beats and mixes them into each other like a real DJ.</p>
+</section>
+
+<section class="setup card">
   <div class="group">
-    <div class="glabel">Mode</div>
-    <div id="modes" class="seg">
-      <button data-mode="dance"><b>🔥</b>Dance Floor</button>
-      <button data-mode="warmup"><b>🌅</b>Warm Up</button>
-      <button data-mode="romantic"><b>❤️</b>Romantic</button>
-      <button data-mode="chill"><b>🌙</b>Chill</button>
+    <div class="glabel">Vibe</div>
+    <div id="modes" class="modes">
+      <button data-mode="dance"><b>🔥</b><span class="mn">Dance Floor</span><span class="md">Non-stop bangers</span></button>
+      <button data-mode="warmup"><b>🌅</b><span class="mn">Warm Up</span><span class="md">A smooth build-up</span></button>
+      <button data-mode="romantic"><b>❤️</b><span class="mn">Romantic</span><span class="md">Slow and sweet</span></button>
+      <button data-mode="chill"><b>🌙</b><span class="mn">Chill</span><span class="md">Laid-back vibes</span></button>
     </div>
   </div>
   <div class="group">
     <div class="glabel">Language</div>
-    <div id="langs" class="seg small">
+    <div id="langs" class="pills">
       <button data-lang="hindi">Hindi</button>
       <button data-lang="punjabi">Punjabi</button>
       <button data-lang="desi">Hindi + Punjabi</button>
@@ -43,67 +50,81 @@
     </div>
   </div>
   <div class="group energy">
-    <div class="glabel">Energy <span id="energyVal"></span> <button id="energyAuto" class="link">auto</button></div>
-    <input id="energy" type="range" min="0" max="1" step="0.01" value="0.8">
+    <div class="glabel">Energy <span id="energyVal" class="eval"></span> <button id="energyAuto" class="link">back to auto</button></div>
+    <input id="energy" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Energy">
   </div>
 </section>
 
 <section class="transport">
   <button id="start" class="big">▶ Start the party</button>
-  <button id="pause" disabled>⏸ Pause</button>
-  <button id="mixnow" disabled title="Shortcut: N">⇄ Mix now</button>
-  <button id="skip" disabled>⏭ Skip</button>
+  <button id="pause" class="ctl" disabled>⏸ Pause</button>
+  <button id="mixnow" class="ctl" disabled title="Shortcut: N">⇄ Mix now</button>
+  <button id="skip" class="ctl" disabled>⏭ Skip</button>
+</section>
+
+<section class="how">
+  <div class="step"><b>1</b><div><h4>It picks the songs</h4><p>Based on your vibe, language and favourites, with real official releases where it can find them.</p></div></div>
+  <div class="step"><b>2</b><div><h4>It listens to them</h4><p>Tempo, beats, key, drops and breakdowns, plus an AI check of how party-ready each song is.</p></div></div>
+  <div class="step"><b>3</b><div><h4>It mixes like a DJ</h4><p>Beat-matched blends timed to the music, so two kick drums or two singers never clash.</p></div></div>
 </section>
 
 <section class="decks">
-  <div class="deck" id="deck0"></div>
-  <div class="mixerv">
+  <div class="deck card" id="deck0"></div>
+  <div class="mixerv card">
     <div class="meters"><div class="meter"><i id="m0"></i></div><div class="meter"><i id="m1"></i></div></div>
-    <div id="txLabel" class="txlabel">—</div>
+    <div class="txtext"><div id="txLabel" class="txlabel">—</div><div id="txInfo" class="txinfo"></div></div>
     <div class="txbar"><i id="txProg"></i></div>
-    <div id="txInfo" class="txinfo"></div>
   </div>
-  <div class="deck" id="deck1"></div>
+  <div class="deck card" id="deck1"></div>
 </section>
 
-<section class="lower">
-  <div class="panel">
-    <h3>Up next</h3>
+<section class="lower card">
+  <nav class="tabs" role="tablist">
+    <button class="tab on" data-tab="next" role="tab">Up next</button>
+    <button class="tab" data-tab="request" role="tab">Request</button>
+    <button class="tab" data-tab="favs" role="tab">Favourites</button>
+    <button class="tab" data-tab="set" role="tab">Tonight</button>
+  </nav>
+  <div class="pane on" data-pane="next">
     <div id="next" class="list"></div>
     <h3 class="sub">The DJ is also thinking about</h3>
     <div id="ideas" class="list"></div>
   </div>
-  <div class="panel">
-    <h3>Request a song</h3>
-    <form id="reqForm" class="req"><input id="reqQ" placeholder="Search all sources, e.g. Badshah, bollywood, house"><button>Search</button></form>
+  <div class="pane" data-pane="request">
+    <form id="reqForm" class="req"><input id="reqQ" placeholder="Search a song or artist, e.g. Badshah, Disclosure" autocomplete="off"><button>Search</button></form>
     <div id="reqResults" class="list"></div>
     <h3 class="sub">Your own songs</h3>
     <label class="filebtn">+ Add music files<input id="files" type="file" accept="audio/*" multiple hidden></label>
-    <div id="localInfo" class="hint">MP3, M4A or WAV without DRM. They get mixed in with priority.</div>
-    <h3 class="sub">Your favourite songs</h3>
-    <textarea id="favText" class="favtext" rows="7" spellcheck="false" placeholder="One per line: Song - Artist"></textarea>
-    <div class="req"><button id="favSave">Save favourites</button><button id="favReset" class="link">back to my original list</button></div>
-    <div id="favInfo" class="hint">Boonbeat searches for these first, plays them with priority and learns your taste from them.</div>
+    <div id="localInfo" class="hint">MP3, M4A or WAV without copy protection. They get mixed in with priority.</div>
   </div>
-  <div class="panel">
-    <h3>Tonight's set</h3>
+  <div class="pane" data-pane="favs">
+    <p class="hint top">One song per line, written as Song - Artist. Boonbeat looks for these first and learns your taste from them.</p>
+    <textarea id="favText" class="favtext" rows="9" spellcheck="false" placeholder="Badtameez Dil - Pritam"></textarea>
+    <div class="req"><button id="favSave">Save favourites</button><button id="favReset" class="link">back to the original list</button></div>
+    <div id="favInfo" class="hint"></div>
+  </div>
+  <div class="pane" data-pane="set">
     <canvas id="setGraph" height="70"></canvas>
     <div id="tasteInfo" class="hint"></div>
     <div id="history" class="list"></div>
-    <h3 class="sub">Mix log</h3>
+    <h3 class="sub">How each mix went</h3>
     <div id="mixlog" class="list"></div>
   </div>
 </section>
 
-<footer>Free music from <a href="https://audius.co" target="_blank" rel="noopener">Audius</a>, <a href="https://hearthis.at" target="_blank" rel="noopener">hearthis.at</a> and the <a href="https://archive.org/details/netlabels" target="_blank" rel="noopener">Internet Archive netlabels</a>. Song analysis models by the <a href="https://essentia.upf.edu/models.html" target="_blank" rel="noopener">MTG, Universitat Pompeu Fabra</a> (CC BY-NC-ND 4.0). Click a song's language or mood tag to correct it. Space pauses, N mixes now, ← / → jump 8 bars.</footer>
+<footer>
+  <p>Free music from <a href="https://audius.co" target="_blank" rel="noopener">Audius</a>, <a href="https://hearthis.at" target="_blank" rel="noopener">hearthis.at</a> and the <a href="https://archive.org/details/netlabels" target="_blank" rel="noopener">Internet Archive</a>. Song analysis models by the <a href="https://essentia.upf.edu/models.html" target="_blank" rel="noopener">MTG, Universitat Pompeu Fabra</a> (CC BY-NC-ND 4.0).</p>
+  <p class="keys">Tap a song's language or mood tag to correct it. Keyboard: Space pauses, N mixes now, ← / → jump 8 bars.</p>
+</footer>
 
+</div>
 <script src="js/analysis.js?v=24"></script>
 <script src="js/sources.js?v=27"></script>
 <script src="js/favorites.js?v=26"></script>
 <script src="js/brain.js?v=32"></script>
 <script src="js/taste.js?v=23"></script>
 <script src="js/ml.js?v=24"></script>
-<script src="js/mixer.js?v=23"></script>
-<script src="js/app.js?v=30"></script>
+<script src="js/mixer.js?v=24"></script>
+<script src="js/app.js?v=34"></script>
 </body>
 </html>

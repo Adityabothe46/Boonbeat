@@ -61,9 +61,21 @@
   // the same song is often uploaded several times: keep the best-loved copy
   const dupKey = t => (t.title || '').toLowerCase().replace(/\(.*?\)|\[.*?\]/g, '').replace(/[^a-z0-9ऀ-੿]+/g, '') + '|' + Math.round((t.duration || 0) / 4);
   S.dups = new Map();
+  // display-ready titles: "17 - Sooraj Dooba Hain - Arijit Singh [" -> "Sooraj Dooba Hain - Arijit Singh"
+  function niceTitle(s) {
+    const out = String(s || '')
+      .replace(/^\s*\d{1,3}\s*[-.)_]\s+/, '')        // "17 - ", "03. ", "1) "
+      .replace(/^\s*0\d\s+(?=[A-Za-z])/, '')         // "03 Yo Yo Honey Singh..."
+      .replace(/\s*[\(\[][^\)\]]*$/, '')             // a bracket that never closes
+      .replace(/\s*[-–|:]\s*$/, '')
+      .replace(/\s{2,}/g, ' ').trim();
+    return out || String(s || '').trim();
+  }
   function addToPool(list) {
     for (const t of list) {
+      if (!t || !t.id) continue;
       if (S.pool.has(t.id)) continue;
+      t.title = niceTitle(t.title);
       const k = dupKey(t), prevId = S.dups.get(k), prev = prevId && S.pool.get(prevId);
       if (prev) {
         const better = B.popularity(t) > B.popularity(prev) && !S.played.has(prev.id) && !(S.crate && S.crate.has(prev.id)) && S.next !== prev;
@@ -236,7 +248,7 @@
     const plan = mixer.makePlan(mode(), planOpts(cur, cand));
     mixer.schedule(plan);
     console.log('[upgrade]', old.title, now.total.toFixed(2), '->', cand.title, alt.total.toFixed(2));
-    status(`Swapped in “${cand.title}”: it fits better than “${old.title}” · ${plan && (plan.why || plan.label)}`);
+    status(`Swapped in “${cand.title}”: it fits better than “${old.title}”${plan ? ' · ' + (plan.why || plan.label) : ''}`);
     renderDeck(0); renderDeck(1); renderNext(); renderIdeas();
   }
 
@@ -328,25 +340,61 @@
   }
 
   /* ---------- the set ---------- */
+  const offlineMsg = 'You are offline. Connect to the internet and Boonbeat carries on by itself.';
+  function startButton(state) {
+    const b = $('#start');
+    b.classList.toggle('busy', state === 'busy');
+    b.disabled = state !== 'idle' && state !== 'tap';
+    b.innerHTML = { idle: '<span>▶</span> Start the party', busy: '<span class="spin"></span> Getting the party ready…', tap: '<span>▶</span> Tap to play', live: '<span class="dot"></span> Live' }[state];
+  }
+  function goLive(t) {
+    ['#pause', '#mixnow', '#skip'].forEach(s => { $(s).disabled = false; });
+    startButton('live');
+    document.body.classList.add('live');
+    keepAwake();
+    onNowPlaying(t);
+  }
   async function start() {
     if (S.started) return;
+    // a phone blocked the first song: this tap is allowed to start it
+    if (S.pendingFirst && mixer) {
+      const first = S.pendingFirst; S.pendingFirst = null;
+      mixer.unlock();
+      try { await mixer.current.el.play(); S.started = true; goLive(first.track); return; }
+      catch (e) { console.warn('play still blocked', e); }
+    }
     S.started = true;
-    $('#start').disabled = true;
-    mixer = new window.DJMixer.Mixer();
-    window.DJ.mixer = mixer;
+    startButton('busy');
+    if (!mixer) {
+      mixer = new window.DJMixer.Mixer();
+      window.DJ.mixer = mixer;
+      mixer.onTransitionDone = done => { logMix(done); onNowPlaying(mixer.current.track); };
+      mixer.onEnded = onEnded;
+    }
+    mixer.unlock();                  // must happen inside the tap, before any waiting
     mixer.setVolume(S.volume);
     await mixer.resume();
-    mixer.onTransitionDone = done => { logMix(done); onNowPlaying(mixer.current.track); };
-    mixer.onEnded = onEnded;
+    if (!navigator.onLine) { S.started = false; startButton('idle'); status('You are offline. Connect to the internet, then tap Start.'); return; }
     await ensurePool();
-    const gen = S.gen;
-    const first = await chooseNext(null, gen);
-    if (!first) { S.started = false; $('#start').disabled = false; return; }
-    await mixer.startFirst(first.track, first.blob);
-    ['#pause', '#mixnow', '#skip'].forEach(s => { $(s).disabled = false; });
-    $('#start').textContent = '● Live';
-    keepAwake();
-    onNowPlaying(first.track);
+    for (let tries = 0; tries < 4 && S.started; tries++) {
+      const first = await chooseNext(null, S.gen);
+      if (!first) break;
+      try { await mixer.startFirst(first.track, first.blob); goLive(first.track); return; }
+      catch (e) {
+        if (e && e.name === 'NotAllowedError') {
+          // the phone wants one more tap before it plays sound
+          S.started = false; S.pendingFirst = first; startButton('tap');
+          status('Your phone needs one more tap to play sound. Tap "Tap to play".');
+          return;
+        }
+        console.warn('first song failed, trying another', first.track.title, e);
+        first.track.bad = true; S.rejected.add(first.track.id);
+      }
+    }
+    S.started = false; startButton('idle');
+    status(navigator.onLine
+      ? 'Could not get songs ready right now. Give it a moment and tap Start again, or try another mode or language.'
+      : 'You are offline. Connect to the internet, then tap Start.');
   }
 
   function onNowPlaying(t) {
@@ -365,21 +413,36 @@
     preloadNext();
   }
 
+  // nothing ready (no internet, or every candidate failed): try again shortly, the music must not stop
+  function retryNext(gen, ms = 6000) {
+    if (!S.started) return;
+    status(navigator.onLine ? 'Still looking for the next song…' : offlineMsg);
+    setTimeout(() => { if (S.started && gen === S.gen && !S.next && !S.loadingNext) preloadNext(); }, ms);
+  }
   async function preloadNext() {
     const gen = ++S.gen;
     S.loadingNext = true; renderNext();
     const cur = mixer.current.track;
-    const got = await chooseNext(cur, gen);
+    let got = null;
+    try { got = await chooseNext(cur, gen); } catch (e) { console.warn('choosing failed', e); }
     if (gen !== S.gen) return;
     S.loadingNext = false;
-    if (!got) { renderNext(); return; }
+    if (!got) { renderNext(); retryNext(gen); return; }
     if (mixer.tx) { S.requests.unshift(got.track); return; }
-    await mixer.prepareNext(got.track, got.blob);
+    try { await mixer.prepareNext(got.track, got.blob); }
+    catch (e) {
+      console.warn('next song would not open, picking another', got.track.title, e);
+      got.track.bad = true; S.rejected.add(got.track.id);
+      if (gen === S.gen) retryNext(gen, 800);
+      return;
+    }
     if (gen !== S.gen) return;
     S.next = got.track; S.nextBlob = got.blob;
     const plan = mixer.makePlan(mode(), planOpts(cur, got.track));
     mixer.schedule(plan);
-    status(`Next: “${got.track.title}” · ${plan.why || plan.label + ' at ' + fmt(plan.startTime)}`);
+    // no plan means the two songs can't be lined up yet (rare): the song still plays next, as a clean fade
+    status(plan ? `Next: “${got.track.title}” · ${plan.why || plan.label + ' at ' + fmt(plan.startTime)}` : `Next: “${got.track.title}”`);
+    if (!plan) setTimeout(replan, 2000);
     renderDeck(0); renderDeck(1); renderNext(); renderIdeas();
     if (S.waitingHard) { S.waitingHard = false; await mixer.hardStart(); onNowPlaying(mixer.current.track); }
   }
@@ -458,7 +521,7 @@
     box.innerHTML = '';
     for (const m of S.mixLog.slice().reverse().slice(0, 12)) {
       const d = document.createElement('div'); d.className = 'logrow';
-      d.innerHTML = `<b>${esc(m.from)} → ${esc(m.to)}</b><span>${esc(m.why)} · tempo ${esc(m.tempo)}${m.phaseAtSwitch ? ' · beat error ' + esc(m.phaseAtSwitch) : ''}</span>${m.picked ? `<span>Picked because: ${esc(m.picked)}</span>` : ''}`;
+      d.innerHTML = `<b>${esc(m.from)} → ${esc(m.to)}</b><span>${esc(m.why)} · tempo ${esc(m.tempo)}${m.phaseAtSwitch ? ' · beats off by ' + esc(m.phaseAtSwitch) : ''}</span>${m.picked ? `<span>Picked because: ${esc(m.picked)}</span>` : ''}`;
       box.appendChild(d);
     }
   }
@@ -494,7 +557,20 @@
   $('#volume').value = S.volume;
   $('#volume').oninput = e => { S.volume = +e.target.value; if (mixer) mixer.setVolume(S.volume); saveSettings(); };
   $('#start').onclick = () => start().catch(err => { console.error(err); status('Something went wrong: ' + err.message); S.started = false; $('#start').disabled = false; });
-  $('#pause').onclick = async () => { const p = await mixer.togglePause(); $('#pause').textContent = p ? '▶ Resume' : '⏸ Pause'; };
+  $('#pause').onclick = async () => {
+    if (!mixer) return;
+    const p = await mixer.togglePause();
+    $('#pause').textContent = p ? '▶ Resume' : '⏸ Pause';
+    document.body.classList.toggle('paused', !!p);
+    status(p ? 'Paused. Tap Resume to carry on.' : 'Back on.');
+  };
+
+  /* ---------- tabs ---------- */
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === b.dataset.tab));
+    if (b.dataset.tab === 'set') renderHistory();   // the energy graph needs to be visible to size itself
+  });
   $('#mixnow').onclick = () => mixNow(false);
 
   /* ---------- phone app bits ---------- */
@@ -557,7 +633,7 @@
   $('#files').onchange = async e => {
     const files = [...e.target.files];
     const list = [];
-    for (const f of files) list.push(await Src.fromFile(f));
+    for (const f of files) { try { list.push(await Src.fromFile(f)); } catch (err) { console.warn('skipped file', f.name, err); } }
     addToPool(list);
     $('#localInfo').textContent = `${[...S.pool.values()].filter(t => t.src === 'local').length} of your own songs added.`;
     renderIdeas();
@@ -657,10 +733,9 @@
     const el = $('#deck' + i);
     const d = mixer && mixer.decks[i];
     const t = d && d.track;
-    if (!t) { el.innerHTML = `<div class="empty">Deck ${'AB'[i]}</div>`; el.classList.remove('live'); deckCanvases[i] = null; return; }
+    if (!t) { el.innerHTML = `<div class="empty">${i === 0 ? 'Getting the first song ready…' : 'The next song loads here'}</div>`; el.classList.remove('live'); deckCanvases[i] = null; return; }
     el.innerHTML = `<div class="head"><div class="art" style="background-image:url('${esc(t.artwork)}')"></div>
-      <div class="meta"><div class="name">${esc(t.title)}</div><div class="artist">${t.link ? `<a href="${esc(t.link)}" target="_blank" rel="noopener">${esc(t.artist)}</a>` : esc(t.artist)}</div></div>
-      <span class="badge">${'AB'[i]} · <span class="st"></span></span>
+      <div class="meta"><span class="badge"><span class="st"></span></span><div class="name" title="${esc(t.title)}">${esc(t.title)}</div><div class="artist">${t.link ? `<a href="${esc(t.link)}" target="_blank" rel="noopener">${esc(t.artist)}</a>` : esc(t.artist)}</div></div>
       <span class="thumbs"><button class="thumb up${rated(t) > 0 ? ' on' : ''}" title="More like this">👍</button><button class="thumb down${rated(t) < 0 ? ' on' : ''}" title="Never play this again">👎</button></span></div>
       <div class="chipslot"></div><div class="ebar"><i style="width:${Math.round(B.energyOf(t) * 100)}%"></i></div>
       <canvas width="800" height="140"></canvas><div class="times"><span class="el"></span><span class="rm"></span></div>
@@ -688,7 +763,7 @@
     const live = mixer.cur === i;
     el.classList.toggle('live', live);
     const st = el.querySelector('.st');
-    if (st) st.textContent = live ? 'LIVE' : (mixer.tx ? 'MIXING IN' : (S.next === t ? 'CUED' : 'IDLE'));
+    if (st) st.textContent = live ? 'NOW PLAYING' : (mixer.tx ? 'MIXING IN' : (S.next === t ? 'UP NEXT' : 'WAITING'));
     if (!cv || !t || !t.a) return;
     const a = t.a, g = cv.getContext('2d'), W = cv.width, H = cv.height;
     const dur = a.duration, pos = d.time;
@@ -735,8 +810,8 @@
       if (S.next.pickWhy) { const w = document.createElement('div'); w.className = 's'; w.textContent = 'Why: ' + S.next.pickWhy; el.querySelector('.meta').appendChild(w); }
       box.appendChild(el);
     }
-    else if (S.loadingNext) box.innerHTML = '<div class="hint">Choosing and analysing the next song…</div>';
-    else if (!S.started) box.innerHTML = '<div class="hint">Hit Start and the DJ takes over.</div>';
+    else if (S.loadingNext) box.innerHTML = '<div class="hint">Choosing and listening to the next song…</div>';
+    else if (!S.started) box.innerHTML = '<div class="hint">Start the party and the DJ takes over from here.</div>';
     for (const r of S.requests) box.appendChild(row(r, [['Remove', () => { S.requests = S.requests.filter(x => x !== r); renderNext(); }]], true));
   }
 
@@ -770,6 +845,7 @@
     }
     renderTaste();
     const cv = $('#setGraph'); const g = cv.getContext('2d');
+    if (!cv.clientWidth) return;   // its tab is closed
     cv.width = cv.clientWidth * devicePixelRatio; cv.height = 70 * devicePixelRatio;
     const W = cv.width, H = cv.height;
     g.clearRect(0, 0, W, H);
@@ -804,7 +880,20 @@
     requestAnimationFrame(frame);
   }
 
+  /* ---------- self-healing ---------- */
+  // every few seconds: is the music still going, and is a next song on its way?
+  setInterval(() => {
+    if (!S.started || !mixer || mixer.paused) return;
+    const cur = mixer.current;
+    if (cur.track && cur.el.paused && !cur.el.ended && !mixer.tx) cur.el.play().catch(() => {}); // e.g. after a phone call
+    if (!mixer.tx && !S.next && !S.loadingNext && !S.filling && navigator.onLine) preloadNext();
+  }, 8000);
+  window.addEventListener('offline', () => { if (S.started) status(offlineMsg + ' The current song keeps playing.'); });
+  window.addEventListener('online', () => { if (!S.started) return; status('Back online.'); if (!S.next && !S.loadingNext) preloadNext(); fillCrate(); });
+  window.addEventListener('unhandledrejection', e => console.warn('[boonbeat] background task failed:', e.reason));
+
   // init
+  startButton('idle');
   setMode(S.mode); setLang(S.lang); updateEnergyUI(); renderAll(); frame();
   window.DJ = { S, B, Src, get mixer() { return mixer; }, set mixer(m) { mixer = m; }, addToPool, request, renderAll, start };
 })();
