@@ -397,6 +397,15 @@
       : 'You are offline. Connect to the internet, then tap Start.');
   }
 
+  // the page glows in the colours of the song's artwork
+  function ambience(t) {
+    const a = document.querySelector('.ambient i'); if (!a) return;
+    a.classList.remove('on');
+    if (!t.artwork) return;
+    const img = new Image();
+    img.onload = () => { a.style.backgroundImage = `url("${t.artwork.replace(/"/g, '%22')}")`; requestAnimationFrame(() => a.classList.add('on')); };
+    img.src = t.artwork;
+  }
   function onNowPlaying(t) {
     S.history.push(t);
     S.played.add(t.id);
@@ -408,6 +417,7 @@
     S.crate.delete(t.id);
     S.next = null;
     showOnLockScreen(t);
+    ambience(t);
     status(`Now playing “${t.title}” by ${t.artist}`);
     renderHistory(); renderDeck(0); renderDeck(1); renderNext();
     preloadNext();
@@ -722,7 +732,7 @@
   }
   function row(t, actions = [], dim) {
     const r = document.createElement('div'); r.className = 'row' + (dim ? ' dim' : '');
-    r.innerHTML = `<div class="art" style="background-image:url('${esc(t.artwork)}')"></div><div class="meta"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.artist)}${t.duration ? ' · ' + fmt(t.duration) : ''}</div></div>`;
+    r.innerHTML = `<div class="art${t.artwork ? '' : ' noart'}" style="background-image:url('${esc(t.artwork)}')"></div><div class="meta"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.artist)}${t.duration ? ' · ' + fmt(t.duration) : ''}</div></div>`;
     r.querySelector('.meta').appendChild(chips(t));
     for (const [label, fn] of actions) { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; r.appendChild(b); }
     return r;
@@ -734,7 +744,7 @@
     const d = mixer && mixer.decks[i];
     const t = d && d.track;
     if (!t) { el.innerHTML = `<div class="empty">${i === 0 ? 'Getting the first song ready…' : 'The next song loads here'}</div>`; el.classList.remove('live'); deckCanvases[i] = null; return; }
-    el.innerHTML = `<div class="head"><div class="art" style="background-image:url('${esc(t.artwork)}')"></div>
+    el.innerHTML = `<div class="head"><div class="art${t.artwork ? '' : ' noart'}" style="background-image:url('${esc(t.artwork)}')"></div>
       <div class="meta"><span class="badge"><span class="st"></span></span><div class="name" title="${esc(t.title)}">${esc(t.title)}</div><div class="artist">${t.link ? `<a href="${esc(t.link)}" target="_blank" rel="noopener">${esc(t.artist)}</a>` : esc(t.artist)}</div></div>
       <span class="thumbs"><button class="thumb up${rated(t) > 0 ? ' on' : ''}" title="More like this">👍</button><button class="thumb down${rated(t) < 0 ? ' on' : ''}" title="Never play this again">👎</button></span></div>
       <div class="chipslot"></div><div class="ebar"><i style="width:${Math.round(B.energyOf(t) * 100)}%"></i></div>
