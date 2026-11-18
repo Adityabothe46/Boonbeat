@@ -66,6 +66,8 @@
     const out = String(s || '')
       .replace(/^\s*\d{1,3}\s*[-.)_]\s+/, '')        // "17 - ", "03. ", "1) "
       .replace(/^\s*0\d\s+(?=[A-Za-z])/, '')         // "03 Yo Yo Honey Singh..."
+      .replace(/[\(\[]\s*(mp3\s*)?\d{2,3}\s*k(bps)?\s*[\)\]]/ig, '')   // "(MP3 128K)", "[320kbps]"
+      .replace(/\s*[\(\[]?\s*\b(lyrics?|lyrical( video)?|full song|official (audio|video|music video))\b\s*[\)\]]?/ig, ' ')
       .replace(/\s*[\(\[][^\)\]]*$/, '')             // a bracket that never closes
       .replace(/\s*[-–|:]\s*$/, '')
       .replace(/\s{2,}/g, ' ').trim();
@@ -354,6 +356,7 @@
     ['#pause', '#mixnow', '#skip'].forEach(s => { $(s).disabled = false; });
     startButton('live');
     document.body.classList.add('live');
+    const upNext = document.querySelector('.tab[data-tab="next"]'); if (upNext) upNext.click();   // show what's coming
     keepAwake();
     onNowPlaying(t);
   }
@@ -646,19 +649,30 @@
     e.preventDefault();
     const q = $('#reqQ').value.trim();
     if (!q) return;
-    $('#reqResults').innerHTML = '<div class="hint">Searching…</div>';
+    const box = $('#reqResults'), btn = $('#reqForm button');
+    box.innerHTML = '<div class="hint searching"><span class="spin"></span> Searching Audius, hearthis.at and the Internet Archive…</div>';
+    btn.disabled = true;
     try {
-      const list = await Src.searchAll(q);
+      if (!navigator.onLine) throw new Error('offline');
+      // give up after 20 s rather than leaving you waiting
+      const list = await Promise.race([Src.searchAll(q), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 20000))]);
       addToPool(list);
-      const shown = list.map(t => S.pool.get(t.id));
-      $('#reqResults').innerHTML = shown.length ? '' : '<div class="hint">Nothing playable found.</div>';
-      for (const t of shown.slice(0, 15)) $('#reqResults').appendChild(row(t, [['Play next', () => request(t)]]));
-    } catch (err) { $('#reqResults').innerHTML = '<div class="hint">Search failed: ' + esc(err.message) + '</div>'; }
+      // the song may already be in the pool under a slightly different upload: show what's there
+      const shown = [...new Set(list.map(t => S.pool.get(t.id)).filter(Boolean))];
+      box.innerHTML = shown.length ? '' : `<div class="hint">Couldn't find “${esc(q)}” on the free music sources. Try the artist's name, or fewer words from the title.</div>`;
+      for (const t of shown.slice(0, 20)) box.appendChild(row(t, [['Play next', () => request(t)]]));
+      if (shown.length && !S.started) box.insertAdjacentHTML('afterbegin', '<div class="hint top">Tap Play next on a song, then start the party: it plays first.</div>');
+    } catch (err) {
+      box.innerHTML = `<div class="hint">${err.message === 'offline' ? 'You are offline. Connect to the internet and search again.'
+        : err.message === 'timeout' ? 'The music sources are slow right now. Give it a moment and search again.'
+        : 'Search did not work this time. Try again in a moment.'}</div>`;
+    } finally { btn.disabled = false; }
   };
 
   function request(t) {
+    if (S.requests.includes(t)) { status(`“${t.title}” is already lined up.`); return; }
     S.requests.unshift(t);
-    status(`Requested “${t.title}”, it plays next.`);
+    status(S.started ? `Requested “${t.title}”, it plays next.` : `“${t.title}” will be the first song. Tap Start when you're ready.`);
     if (S.started && !mixer.tx) { S.next = null; mixer.schedule(null); preloadNext(); }
     else renderNext();
   }

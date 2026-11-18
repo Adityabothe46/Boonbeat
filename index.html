@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=44">
+<link rel="stylesheet" href="style.css?v=45">
 </head>
 <body>
 <div class="ambient" aria-hidden="true"><i></i></div>
@@ -100,18 +100,18 @@
 <aside class="side">
 <section class="lower card">
   <nav class="tabs" role="tablist">
-    <button class="tab on" data-tab="next" role="tab">Up next</button>
-    <button class="tab" data-tab="request" role="tab">Request</button>
+    <button class="tab" data-tab="next" role="tab">Up next</button>
+    <button class="tab on" data-tab="request" role="tab">Search</button>
     <button class="tab" data-tab="favs" role="tab">Favourites</button>
     <button class="tab" data-tab="set" role="tab">Tonight</button>
   </nav>
-  <div class="pane on" data-pane="next">
+  <div class="pane" data-pane="next">
     <div id="next" class="list"></div>
     <h3 class="sub">The DJ is also thinking about</h3>
     <div id="ideas" class="list"></div>
   </div>
-  <div class="pane" data-pane="request">
-    <form id="reqForm" class="req"><input id="reqQ" placeholder="Search a song or artist, e.g. Badshah, Disclosure" autocomplete="off"><button>Search</button></form>
+  <div class="pane on" data-pane="request">
+    <form id="reqForm" class="req"><input id="reqQ" type="search" enterkeyhint="search" placeholder="Search a song or artist, e.g. Badshah, Disclosure" autocomplete="off"><button>Search</button></form>
     <div id="reqResults" class="list"></div>
     <h3 class="sub">Your own songs</h3>
     <label class="filebtn">+ Add music files<input id="files" type="file" accept="audio/*" multiple hidden></label>
@@ -147,6 +147,6 @@
 <script src="js/taste.js?v=23"></script>
 <script src="js/ml.js?v=24"></script>
 <script src="js/mixer.js?v=24"></script>
-<script src="js/app.js?v=44"></script>
+<script src="js/app.js?v=46"></script>
 </body>
 </html>

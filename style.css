@@ -59,8 +59,13 @@ body.live.paused .pulse { background: var(--amber); animation: none; }
 /* before the party: a spinning record on the right. Once it's live, the queue takes its place */
 .showcase { display: none; }
 @media (min-width: 1181px) {
-  body:not(.live) .side { display: none; }
-  body:not(.live) .showcase { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; min-height: 560px; position: sticky; top: 18px; }
+  /* the stage spans both rows; the right column holds the record on top and the tools (search, favourites) under it */
+  .stage { grid-row: 1 / span 2; }
+  .showcase, .side { grid-column: 2; }
+  body:not(.live) .showcase { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 6px 0 4px; }
+  body:not(.live) .side { position: static; }
+  body:not(.live) .side .lower { max-height: none; }
+  body:not(.live) .deckart { width: 250px; height: 250px; }
 }
 .deckart { position: relative; width: 340px; height: 340px; }
 .deckart::before { content: ""; position: absolute; inset: -50px; border-radius: 50%; background: radial-gradient(circle, #ff3d9a50 0%, #8a5cff30 42%, transparent 70%); filter: blur(34px); animation: breathe 4s ease-in-out infinite; }
@@ -217,6 +222,8 @@ body.live .decks { display: flex; }
 .filebtn:hover { border-color: var(--cyan); }
 .hint { color: var(--dim); font-size: 13px; margin-top: 8px; }
 .hint.top { margin: 0 0 12px; }
+.hint.searching { display: flex; align-items: center; gap: 10px; }
+.req input[type=search]::-webkit-search-cancel-button { filter: invert(.7); }
 #setGraph { width: 100%; height: 70px; display: block; margin-bottom: 8px; }
 .logrow { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 14px; background: var(--card2); font-size: 12.5px; }
 .logrow b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
