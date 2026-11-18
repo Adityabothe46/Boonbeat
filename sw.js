@@ -1,6 +1,6 @@
 /* Boonbeat offline shell: the app's own files are cached so it opens instantly and installs as an app.
    Always tries the network first, so updates show up on the next open. Music is never cached here. */
-const CACHE = 'boonbeat-v5';
+const CACHE = 'boonbeat-v6';
 self.addEventListener('install', e => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(
   caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));

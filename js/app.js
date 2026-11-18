@@ -210,13 +210,16 @@
     try {
       let misses = 0;
       while (S.started && S.crate.size < CRATE_SIZE && misses < 8) {
-        const exclude = new Set([...S.crate.keys(), ...S.rejected, ...(S.next ? [S.next.id] : [])]);
+        const playing = mixer && mixer.decks.map(d => d.track && d.track.id).filter(Boolean);
+        const exclude = new Set([...S.crate.keys(), ...S.rejected, ...S.played, ...(playing || []), ...(S.next ? [S.next.id] : [])]);
         const cur = mixer && mixer.current.track;
         let t = B.pick([...S.pool.values()], ctxFor(cur), exclude);
         if (!t) { await moreSongs(); t = B.pick([...S.pool.values()], ctxFor(cur), exclude); if (!t) break; }
         try {
           const blob = await loadFull(t);
           if (!fits(t)) { S.rejected.add(t.id); misses++; continue; }
+          // it may have started playing while we were loading it
+          if (S.played.has(t.id) || (mixer && mixer.decks.some(d => d.track === t))) continue;
           S.crate.set(t.id, { track: t, blob });
           renderIdeas();
           await maybeUpgradeNext(t, blob);
@@ -439,7 +442,7 @@
     showOnLockScreen(t);
     ambience(t);
     status(`Now playing “${t.title}” by ${t.artist}`);
-    renderHistory(); renderDeck(0); renderDeck(1); renderNext();
+    renderHistory(); renderDeck(0); renderDeck(1); renderNext(); renderIdeas();
     preloadNext();
   }
 
@@ -852,7 +855,7 @@
     if (S.started && S.crate.size) {
       const cur = mixer && mixer.current.track, ctx = ctxFor(cur);
       const sim = cur && cur.a && cur.a.beatSync ? { curBar: mixer.current.beatPos(mixer.current.time) / 4, playStart: mixer.playStart } : null;
-      const list = [...S.crate.values()].map(c => ({ t: c.track, r: cur && sim ? B.transitionScore(c.track, ctx, sim) : B.scoreDetail(c.track, ctx) }))
+      const list = [...S.crate.values()].filter(c => !S.played.has(c.track.id) && !(mixer && mixer.decks.some(d => d.track === c.track))).map(c => ({ t: c.track, r: cur && sim ? B.transitionScore(c.track, ctx, sim) : B.scoreDetail(c.track, ctx) }))
         .filter(x => x.r).sort((a, b) => b.r.total - a.r.total);
       for (const { t, r } of list) {
         const el = row(t, [['Play next', () => request(t)]], true);
