@@ -122,7 +122,7 @@
     const mel = new Float32Array(nF * BANDS);
     for (let f = 0; f < nF; f++) {
       melOfFrame(x, f * HOP, mel, f * BANDS, cfg);
-      if (f % 4000 === 3999) await sleep(0);
+      if (f % 800 === 799) await sleep(0);   // small slices, so the page never freezes
     }
     return { mel, nF };
   }
@@ -156,7 +156,7 @@
     const nP = Math.floor(nF / PATCH);
     if (nP < 2) return null;
     const dance = [], party = [], voice = [];
-    const BATCH = 16;
+    const BATCH = 4;   // short GPU bursts: long ones stall the mixer on phones
     for (let p0 = 0; p0 < nP; p0 += BATCH) {
       const nb = Math.min(BATCH, nP - p0);
       const res = tf.tidy(() => {

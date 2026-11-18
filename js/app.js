@@ -162,12 +162,21 @@
   }
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
-  async function quietTime() { while (mixer && mixer.tx) await sleep(300); } // don't crunch audio mid-blend
+  // don't crunch audio during a blend, or in the 25 s before one starts (the mixer must keep perfect time then)
+  function mixSoon() {
+    if (!mixer) return false;
+    if (mixer.tx) return true;
+    const p = mixer.plan, cur = mixer.current;
+    return !!(p && cur && cur.track && cur.time > p.startTime - 25 && cur.time < p.startTime + 5);
+  }
+  async function quietTime() { while (mixSoon()) await sleep(400); }
 
   /* ---------- the crate ----------
      Like a DJ pulling records: keep a few candidates downloaded and fully analysed (beats, structure,
      AI scores) ahead of time, then choose the next song by simulating the actual mix with each one. */
-  const CRATE_SIZE = 6;
+  // phones prepare fewer songs ahead: less downloading, less memory, less background work
+  const PHONE = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || (navigator.deviceMemory && navigator.deviceMemory <= 4);
+  const CRATE_SIZE = PHONE ? 3 : 6;
   S.crate = new Map();
   S.filling = false;
 

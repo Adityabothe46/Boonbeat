@@ -532,7 +532,32 @@
     const audio = await ctx.decodeAudioData(buf);
     const ch = [];
     for (let c = 0; c < audio.numberOfChannels; c++) ch.push(audio.getChannelData(c));
+    // in the browser the number crunching happens in a worker thread (no freezes while music plays)
+    const w = worker();
+    if (w) {
+      try { return await inWorker(w, ch.map(d => new Float32Array(d)), audio.sampleRate, hintBpm); }
+      catch (e) { console.warn('[analysis] worker failed, analysing here instead:', e.message); }
+    }
     return analyzeSamples(ch, audio.sampleRate, hintBpm);
+  }
+
+  let w0 = null, wFailed = false, nextId = 1;
+  const waiting = new Map();
+  function worker() {
+    if (w0 || wFailed || typeof window === 'undefined' || typeof Worker === 'undefined') return w0;
+    try {
+      w0 = new Worker('js/analysis-worker.js?v=24');
+      w0.onmessage = e => { const p = waiting.get(e.data.id); if (!p) return; waiting.delete(e.data.id); e.data.error ? p.reject(new Error(e.data.error)) : p.resolve(e.data.a); };
+      w0.onerror = e => { wFailed = true; w0 = null; for (const p of waiting.values()) p.reject(new Error(e.message || 'worker error')); waiting.clear(); };
+    } catch (e) { wFailed = true; w0 = null; }
+    return w0;
+  }
+  function inWorker(w, ch, sr, hint) {
+    return new Promise((resolve, reject) => {
+      const id = nextId++;
+      waiting.set(id, { resolve, reject });
+      w.postMessage({ id, ch, sr, hint }, ch.map(d => d.buffer));
+    });
   }
 
   const api = { analyzeSamples, analyzeArrayBuffer, HOP };
