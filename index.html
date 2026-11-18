@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boonbeat</title>
+<link rel="icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#08080f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boonbeat">
+<meta name="description" content="Your AI DJ: picks party songs and mixes them with beat-matched transitions.">
+<link rel="stylesheet" href="style.css?v=26">
+</head>
+<body>
+<header class="top">
+  <div class="logo">Boon<span>beat</span></div>
+  <div id="status" class="status">Pick a mode and a language, then hit Start.</div>
+  <label class="vol">Vol <input id="volume" type="range" min="0" max="1" step="0.01" value="0.9"></label>
+</header>
+
+<section class="controls">
+  <div class="group">
+    <div class="glabel">Mode</div>
+    <div id="modes" class="seg">
+      <button data-mode="dance"><b>🔥</b>Dance Floor</button>
+      <button data-mode="warmup"><b>🌅</b>Warm Up</button>
+      <button data-mode="romantic"><b>❤️</b>Romantic</button>
+      <button data-mode="chill"><b>🌙</b>Chill</button>
+    </div>
+  </div>
+  <div class="group">
+    <div class="glabel">Language</div>
+    <div id="langs" class="seg small">
+      <button data-lang="hindi">Hindi</button>
+      <button data-lang="punjabi">Punjabi</button>
+      <button data-lang="desi">Hindi + Punjabi</button>
+      <button data-lang="english">English</button>
+      <button data-lang="mix">Mix</button>
+    </div>
+  </div>
+  <div class="group energy">
+    <div class="glabel">Energy <span id="energyVal"></span> <button id="energyAuto" class="link">auto</button></div>
+    <input id="energy" type="range" min="0" max="1" step="0.01" value="0.8">
+  </div>
+</section>
+
+<section class="transport">
+  <button id="start" class="big">▶ Start the party</button>
+  <button id="pause" disabled>⏸ Pause</button>
+  <button id="mixnow" disabled title="Shortcut: N">⇄ Mix now</button>
+  <button id="skip" disabled>⏭ Skip</button>
+</section>
+
+<section class="decks">
+  <div class="deck" id="deck0"></div>
+  <div class="mixerv">
+    <div class="meters"><div class="meter"><i id="m0"></i></div><div class="meter"><i id="m1"></i></div></div>
+    <div id="txLabel" class="txlabel">—</div>
+    <div class="txbar"><i id="txProg"></i></div>
+    <div id="txInfo" class="txinfo"></div>
+  </div>
+  <div class="deck" id="deck1"></div>
+</section>
+
+<section class="lower">
+  <div class="panel">
+    <h3>Up next</h3>
+    <div id="next" class="list"></div>
+    <h3 class="sub">The DJ is also thinking about</h3>
+    <div id="ideas" class="list"></div>
+  </div>
+  <div class="panel">
+    <h3>Request a song</h3>
+    <form id="reqForm" class="req"><input id="reqQ" placeholder="Search all sources, e.g. Badshah, bollywood, house"><button>Search</button></form>
+    <div id="reqResults" class="list"></div>
+    <h3 class="sub">Your own songs</h3>
+    <label class="filebtn">+ Add music files<input id="files" type="file" accept="audio/*" multiple hidden></label>
+    <div id="localInfo" class="hint">MP3, M4A or WAV without DRM. They get mixed in with priority.</div>
+    <h3 class="sub">Your favourite songs</h3>
+    <textarea id="favText" class="favtext" rows="7" spellcheck="false" placeholder="One per line: Song - Artist"></textarea>
+    <div class="req"><button id="favSave">Save favourites</button><button id="favReset" class="link">back to my original list</button></div>
+    <div id="favInfo" class="hint">Boonbeat searches for these first, plays them with priority and learns your taste from them.</div>
+  </div>
+  <div class="panel">
+    <h3>Tonight's set</h3>
+    <canvas id="setGraph" height="70"></canvas>
+    <div id="tasteInfo" class="hint"></div>
+    <div id="history" class="list"></div>
+    <h3 class="sub">Mix log</h3>
+    <div id="mixlog" class="list"></div>
+  </div>
+</section>
+
+<footer>Free music from <a href="https://audius.co" target="_blank" rel="noopener">Audius</a>, <a href="https://hearthis.at" target="_blank" rel="noopener">hearthis.at</a> and the <a href="https://archive.org/details/netlabels" target="_blank" rel="noopener">Internet Archive netlabels</a>. Song analysis models by the <a href="https://essentia.upf.edu/models.html" target="_blank" rel="noopener">MTG, Universitat Pompeu Fabra</a> (CC BY-NC-ND 4.0). Click a song's language or mood tag to correct it. Space pauses, N mixes now, ← / → jump 8 bars.</footer>
+
+<script src="js/analysis.js?v=23"></script>
+<script src="js/sources.js?v=27"></script>
+<script src="js/favorites.js?v=26"></script>
+<script src="js/brain.js?v=32"></script>
+<script src="js/taste.js?v=23"></script>
+<script src="js/ml.js?v=23"></script>
+<script src="js/mixer.js?v=23"></script>
+<script src="js/app.js?v=29"></script>
+</body>
+</html>
